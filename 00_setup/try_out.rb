@@ -15,7 +15,7 @@ class TryOut
   end
 
   def full_name
-    [first_name, middle_name, last_name].compact.join(' ')
+    [first_name, middle_name, last_name].compact.reject(&:empty?).join(' ')
   end
 
   def upcase_full_name
