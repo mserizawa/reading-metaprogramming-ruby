@@ -5,7 +5,16 @@ TryOver3 = Module.new
 # - `test_` から始まるインスタンスメソッドが実行された場合、このクラスは `run_test` メソッドを実行する
 # - `test_` メソッドがこのクラスに実装されていなくても `test_` から始まるメッセージに応答することができる
 # - TryOver3::A1 には `test_` から始まるインスタンスメソッドが定義されていない
+class TryOver3::A1
+  def run_test
+    nil
+  end
 
+  def method_missing(name)
+    return super unless name.to_s.start_with?('test_')
+    run_test
+  end
+end
 
 # Q2
 # 以下要件を満たす TryOver3::A2Proxy クラスを作成してください。
@@ -18,25 +27,41 @@ class TryOver3::A2
   end
 end
 
+class TryOver3::A2Proxy
+  def initialize(a2)
+    @source = a2
+  end
+
+  def method_missing(method, *args)
+    @source.send(method, *args)
+  end
+
+  def respond_to_missing?(methoe, include_private = false)
+    @source.respond_to?(methoe) || super
+  end
+end
 
 # Q3
 # 前回 OriginalAccessor の my_attr_accessor で定義した getter/setter に boolean の値が入っている場合には #{name}? が定義されるようなモジュールを実装しました。
 # 今回は、そのモジュールに boolean 以外が入っている場合には hoge? メソッドが存在しないようにする変更を加えてください。
 # （以下は god の模範解答を一部変更したものです。以下のコードに変更を加えてください）
 module TryOver3::OriginalAccessor2
-  def self.included(mod)
-    mod.define_singleton_method :my_attr_accessor do |attr_sym|
-      define_method attr_sym do
-        @attr
-      end
+  def self.included(base)
+    base.extend(ClassMethods)
+  end
 
-      define_method "#{attr_sym}=" do |value|
-        if [true, false].include?(value) && !respond_to?("#{attr_sym}?")
-          self.class.define_method "#{attr_sym}?" do
-            @attr == true
-          end
+  module ClassMethods
+    def my_attr_accessor(arg)
+      define_method arg do
+        @val
+      end
+      define_method "#{arg}=" do |new_val|
+        @val = new_val
+        bool_method_name = "#{arg}?"
+        self.class.send(:remove_method, bool_method_name) if respond_to?(bool_method_name)
+        if !!new_val == new_val
+          self.class.send(:define_method, bool_method_name) { new_val }
         end
-        @attr = value
       end
     end
   end
@@ -48,7 +73,20 @@ end
 # TryOver3::A4.runners = [:Hoge]
 # TryOver3::A4::Hoge.run
 # # => "run Hoge"
+class TryOver3::A4
+  @@runners = []
 
+  define_singleton_method('runners=') do |args|
+    @@runners = args
+    args.each do |name|
+      const_set(name, Class.new { def self.run() 'run Hoge' end })
+    end
+  end
+
+  def self.constants
+    super.reject { |constant| @@runners.include?(constant) }
+  end
+end
 
 # Q5. チャレンジ問題！ 挑戦する方はテストの skip を外して挑戦してみてください。
 #
